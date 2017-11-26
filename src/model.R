@@ -30,17 +30,17 @@ gbmFit1 <- train(WnvPresent ~ ., data = inputDataAgg,
 
 years <- unique(inputDataAgg$Year)
 
-modelYear <- list()
-
-for(i in seq_along(years)){
+modelYear <- sapply(years, function(year){
   
-  modelYear[i] <- train(WnvPresent ~ ., data = inputDataAgg[inputDataAgg$Year == years[i], ], 
-                   method = "rf", 
-                   trControl = fitControl,
-                   metric="Kappa",
-                   nTrain = 0.5,
-                   verbose = TRUE)
-}
+  train(WnvPresent ~ ., data = inputDataAgg[inputDataAgg$Year == years[i], ], 
+        method = "rf", 
+        trControl = fitControl,
+        metric="Kappa",
+        nTrain = 0.5,
+        verbose = TRUE)
+})
+
+
 
 saveRDS(modelYear, "modelYear.RDS")
 
