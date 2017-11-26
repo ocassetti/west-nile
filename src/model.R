@@ -2,7 +2,7 @@
 wnvAgg <- readRDS("src/wnvAgg.RDS")
 testAugmented <- readRDS("src/testAugmented.RDS")
 
-setdiff(colnames(wnvAgg), colnames(testAugmented) )
+intersect(colnames(wnvAgg), colnames(testAugmented) )
 inputDataAgg <- wnvAgg[,c(colnames(testAugmented), "WnvPresent")]
 
 library(caret)
@@ -21,14 +21,28 @@ fitControl <- trainControl( method = "repeatedcv",
                             repeats = 5, 
                             selectionFunction = "oneSE")
 
-
-gbmFit1 <- train(WnvPresent ~ ., data = modelTrainingDf, 
+gbmFit1 <- train(WnvPresent ~ ., data = inputDataAgg, 
                  method = "rf", 
                  trControl = fitControl,
                  metric="Kappa",
                  nTrain = 0.5,
                  verbose = TRUE)
 
+years <- unique(inputDataAgg$Year)
+
+modelYear <- list()
+
+for(i in seq_along(years)){
+  
+  modelYear[i] <- train(WnvPresent ~ ., data = inputDataAgg[inputDataAgg$Year == years[i], ], 
+                   method = "rf", 
+                   trControl = fitControl,
+                   metric="Kappa",
+                   nTrain = 0.5,
+                   verbose = TRUE)
+}
+
+saveRDS(modelYear, "modelYear.RDS")
 
 table(predict(gbmFit1, modelTrainingDf), modelTrainingDf$WnvPresent)
 saveRDS(gbmFit1, "rf.RDS")
@@ -36,5 +50,7 @@ saveRDS(gbmFit1, "rf.RDS")
 
 
 predicted <- predict(gbmFit1, testAugmented)
+
+
 
 write.csv(data.frame(Id=as.character(seq(1, length(predicted))), WnvPresent=as.character(predicted)), "result.csv", row.names = FALSE)

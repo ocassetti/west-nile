@@ -176,13 +176,13 @@ trsp <- trsp[mdist,]
 
 
 trsp2 <- wnvAgg %>% inner_join(unique(trsp[, c(latlong)]), by=c("Latitude", "Longitude")) %>% 
-  left_join(unique(trsp[, c(latlong, "Date", "sprayDate")]), by=c("Latitude" = "Latitude", "Longitude" = "Latitude", "Date" = "Date"))
+  left_join(unique(trsp[, c(latlong, "Date", "sprayDate", "Week")]), by=c("Latitude" = "Latitude", "Longitude" = "Latitude", "Date" = "Date"))
 
 
 trsp2$Sprayed <-  factor(if_else(!is.na(trsp2$sprayDate), 1, 0))
 
-ggplot(trsp2[trsp2$Year %in% c(2011, 2013), ]) + geom_line(aes(x=Date, y=NumMosquitos)) +
-  geom_point(aes(x=Date, y=NumMosquitos, color="spray"), data=trsp2[trsp2$Sprayed ==1, ]) +
+ggplot(trsp2[trsp2$Year %in% c(2011, 2013), ]) + geom_line(aes(x=Week.x, y=NumMosquitos)) +
+  geom_point(aes(x=Week.x , y=NumMosquitos, color="spray"), data=trsp2[trsp2$Sprayed ==1, ]) +
   facet_wrap(~Year+Trap, scales = "free") 
 
 
@@ -254,9 +254,10 @@ augmentTestData <- function(df, weatherStation = matrix(c( -87.933 , 41.995, -87
   
   df$SatelliteTrap <- factor(if_else(nchar(substr(as.character(df$Trap), 5,6)) > 0, 1, 0))
  
-  dfAgg <- df %>% select(Date, Species, SatelliteTrap, Block, Latitude, Longitude, AddressAccuracy,) %>%
-  group_by(Date, Species, SatelliteTrap, Block, Latitude, Longitude, AddressAccuracy) %>% summarise(Tcount=length(SatelliteTrap))
-
+  dfAgg <- df %>% select(Date, Species, SatelliteTrap, Trap, Block, Latitude, Longitude, AddressAccuracy,) %>%
+  group_by(Date, Species, SatelliteTrap, Block, Trap, Latitude, Longitude, AddressAccuracy) %>% summarise(Tcount=length(SatelliteTrap))
+ 
+  dfAgg <- left_join(df, dfAgg) %>% select(Date, Species, SatelliteTrap, Block, Latitude, Longitude, AddressAccuracy,Tcount)
 
 dfAgg$Date <- as.Date(dfAgg$Date)
 species <- as.character(dfAgg$Species)
@@ -288,7 +289,7 @@ wnvAugmented <- augmentTestData(wnv)
 
 testAugmented <- augmentTestData(test)
 
-
+range(testAugmented$Tcount)
 
 ```
 
@@ -297,4 +298,4 @@ saveRDS(wnvAgg , file = "wnvAgg.RDS")
 saveRDS(testAugmented , file = "testAugmented.RDS")
 
 
-```
+S```
