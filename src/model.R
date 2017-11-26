@@ -32,11 +32,12 @@ years <- unique(inputDataAgg$Year)
 
 modelYear <- sapply(years, function(year){
   
-  train(WnvPresent ~ ., data = inputDataAgg[inputDataAgg$Year == years[i], ], 
+  train(WnvPresent ~ ., data = inputDataAgg[inputDataAgg$Year == year, ], 
         method = "rf", 
         trControl = fitControl,
         metric="Kappa",
         nTrain = 0.5,
+        parallel=TRUE,
         verbose = TRUE)
 })
 
