@@ -2,7 +2,7 @@
 wnvAgg <- readRDS("src/wnvAgg.RDS")
 testAugmented <- readRDS("src/testAugmented.RDS")
 
-
+setdiff(colnames(wnvAgg), colnames(testAugmented) )
 inputDataAgg <- wnvAgg[,c(colnames(testAugmented), "WnvPresent")]
 
 library(caret)
@@ -12,19 +12,29 @@ modelTrainingDf <- inputDataAgg[ idxList,]
 modelTestingDf  <- inputDataAgg[-idxList,]
 
 gbmGrid <-  expand.grid(interaction.depth = c(1, 5, 9), 
-                        n.trees = (1:30)*50, 
+                        n.trees = (10:30)*50, 
                         shrinkage = 0.1,
                         n.minobsinnode = 20)
 
 fitControl <- trainControl( method = "repeatedcv",
                             number = 10,
-                            repeats = 10)
+                            repeats = 5, 
+                            selectionFunction = "oneSE")
 
 
 gbmFit1 <- train(WnvPresent ~ ., data = modelTrainingDf, 
-                 method = "gbm", 
+                 method = "rf", 
                  trControl = fitControl,
-                 tuneGrid = gbmGrid,
-                 verbose = FALSE)
-gbmFit1
+                 metric="Kappa",
+                 nTrain = 0.5,
+                 verbose = TRUE)
 
+
+table(predict(gbmFit1, modelTrainingDf), modelTrainingDf$WnvPresent)
+saveRDS(gbmFit1, "rf.RDS")
+
+
+
+predicted <- predict(gbmFit1, testAugmented)
+
+write.csv(data.frame(Id=as.character(seq(1, length(predicted))), WnvPresent=as.character(predicted)), "result.csv", row.names = FALSE)

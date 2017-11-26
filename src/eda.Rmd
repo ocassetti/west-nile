@@ -61,7 +61,48 @@ for(i in 1:ncol(weather)){
      if_else(is.na(xVal), -1, xVal)
  }
 }
-weather
+
+weatherLagged <- union_all(
+filter(weather, Station==1) %>% arrange(Station, Date) %>% mutate(WetBulb1=lag(WetBulb, order_by=Date), 
+                                                                  WetBulb3=lag(WetBulb, n = 3, order_by=Date),
+                                                                  WetBulb5=lag(WetBulb, n = 5, order_by=Date),
+                                                                  WetBulb8=lag(WetBulb, n = 8, order_by=Date),
+                                                                  WetBulb12=lag(WetBulb, n = 12, order_by=Date),
+                                                                  PrecipTotal1=lag(PrecipTotal, order_by=Date),
+                                                                  PrecipTotal3=lag(PrecipTotal, n = 3, order_by=Date),
+                                                                  PrecipTotal5=lag(PrecipTotal, n = 5, order_by=Date),
+                                                                  PrecipTotal8=lag(PrecipTotal, n = 8, order_by=Date),
+                                                                  PrecipTotal12=lag(PrecipTotal, n = 12, order_by=Date),
+                                                                  Tavg1=lag(Tavg, order_by=Date),
+                                                                  Tavg3=lag(Tavg, n = 3, order_by=Date),
+                                                                  Tavg5=lag(Tavg, n = 5, order_by=Date),
+                                                                  Tavg8=lag(Tavg, n = 8, order_by=Date),
+                                                                  Tavg12=lag(Tavg, n = 12, order_by=Date)
+                                                                  ) ,
+filter(weather, Station==2) %>% arrange(Station, Date) %>% mutate(WetBulb1=lag(WetBulb, order_by=Date), 
+                                                                  WetBulb3=lag(WetBulb, n = 3, order_by=Date),
+                                                                  WetBulb5=lag(WetBulb, n = 5, order_by=Date),
+                                                                  WetBulb8=lag(WetBulb, n = 8, order_by=Date),
+                                                                  WetBulb12=lag(WetBulb, n = 12, order_by=Date),
+                                                                  PrecipTotal1=lag(PrecipTotal, order_by=Date),
+                                                                  PrecipTotal3=lag(PrecipTotal, n = 3, order_by=Date),
+                                                                  PrecipTotal5=lag(PrecipTotal, n = 5, order_by=Date),
+                                                                  PrecipTotal8=lag(PrecipTotal, n = 8, order_by=Date),
+                                                                  PrecipTotal12=lag(PrecipTotal, n = 12, order_by=Date),
+                                                                  Tavg1=lag(Tavg, order_by=Date),
+                                                                  Tavg3=lag(Tavg, n = 3, order_by=Date),
+                                                                  Tavg5=lag(Tavg, n = 5, order_by=Date),
+                                                                  Tavg8=lag(Tavg, n = 8, order_by=Date),
+                                                                  Tavg12=lag(Tavg, n = 12, order_by=Date)
+                                                                  )  
+) %>% arrange(Date, Station)
+
+for( i in 20:34){
+  xVal <- weatherLagged[,i]
+  weatherLagged[, i] <- if_else(is.na(xVal), mean(xVal, na.rm = TRUE), xVal)
+}
+
+weather <- weatherLagged 
 
 ```
 
@@ -77,8 +118,9 @@ ggmap(mapdata) +
 
 wnvAgg <- wnv %>% select(Date, Address, Species, Block, Street, Trap, Latitude, Longitude, AddressAccuracy, NumMosquitos, WnvPresent) %>%
   group_by(Date, Address, Species, Block, Street, Trap, Latitude, Longitude, AddressAccuracy) %>%
-  summarise(NumMosquitos=sum(NumMosquitos), WnvPresent=max(WnvPresent))
+  summarise(NumMosquitos=sum(NumMosquitos), WnvPresent=max(WnvPresent), Tcount=length(Trap))
 
+range(wnvAgg$Tcount)
 
 wnvAgg$Date <- as.Date(wnvAgg$Date, format="%Y-%m-%d")
 wnvAgg$WnvPresent <- factor(wnvAgg$WnvPresent)
@@ -87,7 +129,7 @@ wnvAgg$WnvPresent <- factor(wnvAgg$WnvPresent)
 wnvAgg[, c("Year", "Month", "Week", "Day")] <- cbind(as.numeric(strftime(wnvAgg$Date, "%Y")), as.numeric(strftime(wnvAgg$Date, "%m")), 
                                                     as.numeric(strftime(wnvAgg$Date, "%U")), as.numeric(strftime(wnvAgg$Date, "%d")))
 
-ggplot(wnvAgg, aes(x=Date, y=NumMosquitos)) + geom_bar(aes(fill=WnvPresent), stat = "identity") + facet_wrap(~Year, scales = "free_x") 
+ggplot(wnvAgg, aes(x=Week, y=NumMosquitos)) + geom_bar(aes(fill=WnvPresent), stat = "identity") + facet_wrap(~Year, scales = "free_x") 
 
 ```
 
@@ -178,9 +220,9 @@ wnvAgg <- wnvAgg %>% left_join(uLocations)  %>% left_join(weather, by=c("closest
 
 ```{r}
 
-speciesSummary <- wnvAgg %>%  group_by(Month, Year, Species, WnvPresent) %>% summarise(NumMosquitos=sum(NumMosquitos))
+speciesSummary <- wnvAgg %>%  group_by(Week, Year, Species, WnvPresent) %>% summarise(NumMosquitos=sum(NumMosquitos))
 
-ggplot(speciesSummary) + geom_bar(aes(x=Month, y=NumMosquitos, fill=WnvPresent), stat = "identity") + facet_wrap(~Species+Year)
+ggplot(speciesSummary) + geom_bar(aes(x=Week, y=NumMosquitos, fill=WnvPresent), stat = "identity") + facet_wrap(~Species+Year)
 
 speciesSummary <- wnvAgg %>% group_by(Species, WnvPresent) %>% summarise(NumMosquitos=sum(NumMosquitos))
 
@@ -213,7 +255,7 @@ augmentTestData <- function(df, weatherStation = matrix(c( -87.933 , 41.995, -87
   df$SatelliteTrap <- factor(if_else(nchar(substr(as.character(df$Trap), 5,6)) > 0, 1, 0))
  
   dfAgg <- df %>% select(Date, Species, SatelliteTrap, Block, Latitude, Longitude, AddressAccuracy,) %>%
-  group_by(Date, Species, SatelliteTrap, Block, Latitude, Longitude, AddressAccuracy)
+  group_by(Date, Species, SatelliteTrap, Block, Latitude, Longitude, AddressAccuracy) %>% summarise(Tcount=length(SatelliteTrap))
 
 
 dfAgg$Date <- as.Date(dfAgg$Date)
@@ -245,6 +287,7 @@ dfAgg
 wnvAugmented <- augmentTestData(wnv)
 
 testAugmented <- augmentTestData(test)
+
 
 
 ```
