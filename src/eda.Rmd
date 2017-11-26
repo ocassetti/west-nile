@@ -18,13 +18,50 @@ library(ggplot2)
 
 dataDir <- "../input"
 wnv <- read.csv(file.path(dataDir, "train.csv"))
-
+test <- read.csv(file.path(dataDir, "test.csv"))
 spray <- read.csv(file.path(dataDir, "spray.csv"))
 
-weather <- read.csv(file.path(dataDir, "weather.csv"))
+weather <- read.csv(file.path(dataDir, "weather.csv"), stringsAsFactors = FALSE)
 
 mapdata <- readRDS(file.path(dataDir, "mapdata_copyright_openstreetmap_contributors.rds"))
 
+latlong <- c("Longitude", "Latitude")
+
+```
+
+```{r}
+
+hhMMToSeconds <- function(x){
+  x <- as.numeric(x)/100
+  floor(x) * 3600 + (x - floor(x) ) * 60
+}
+weather <- weather %>% mutate(Tavg=as.numeric(replace(as.character(weather$Tavg), Tavg == "M" , as.integer(Tmax) - as.integer(Tmin))))
+
+weather <- weather %>% arrange(Date, Station) %>% mutate(Depart=as.numeric(if_else(Depart=="M", lag(Depart), Depart)))
+weather <- weather %>% arrange(Date, Station) %>% mutate(Sunrise=if_else(Sunrise=="-", as.character(lag(Sunrise)), as.character(Sunrise)))
+weather <- weather %>% arrange(Date, Station) %>% mutate(Sunset=if_else(Sunset=="-", as.character(lag(Sunset)), as.character(Sunset)))
+
+
+weather <- weather %>% mutate(Sunrise=hhMMToSeconds(Sunrise), Sunset=hhMMToSeconds(Sunset)) %>% mutate(DayLenght=(Sunset-Sunrise)) %>%
+mutate(DayLenght=(DayLenght - min(DayLenght))/(max(DayLenght) - min(DayLenght)))
+
+weather <- weather[, -which(colnames(weather) %in% c("Depth", "Water1", "SnowFall", "CodeSum"))]
+weather$Date <- as.Date(weather$Date, format="%Y-%m-%d")
+
+#weather$CodeSum <- factor(weather$CodeSum)
+
+for(i in 1:ncol(weather)){
+ if(class(weather[, i]) == "character"){
+   xVal <- trimws(weather[, i])
+   xValMin <- min(as.numeric(xVal), na.rm = TRUE)
+   xVal <- replace(xVal,  xVal == 'T', xValMin)
+   xVal <- replace(xVal,  xVal == 'M', mean(as.numeric(xVal), na.rm = TRUE))
+   xVal <- as.numeric(xVal) #- min(xVal, na.rm = TRUE)) / (max(xVal, na.rm = TRUE) - min(xVal, na.rm = TRUE))
+   weather[, i] <- 
+     if_else(is.na(xVal), -1, xVal)
+ }
+}
+weather
 
 ```
 
@@ -43,11 +80,12 @@ wnvAgg <- wnv %>% select(Date, Address, Species, Block, Street, Trap, Latitude, 
   summarise(NumMosquitos=sum(NumMosquitos), WnvPresent=max(WnvPresent))
 
 
-wnvAgg$Date <- as.Date(wnvAgg$Date)
+wnvAgg$Date <- as.Date(wnvAgg$Date, format="%Y-%m-%d")
 wnvAgg$WnvPresent <- factor(wnvAgg$WnvPresent)
 
 
-wnvAgg[, c("Year", "Month", "Week", "Day")] <- cbind(strftime(wnvAgg$Date, "%Y"), strftime(wnvAgg$Date, "%m"), strftime(wnvAgg$Date, "%U"), strftime(wnvAgg$Date, "%d"))   
+wnvAgg[, c("Year", "Month", "Week", "Day")] <- cbind(as.numeric(strftime(wnvAgg$Date, "%Y")), as.numeric(strftime(wnvAgg$Date, "%m")), 
+                                                    as.numeric(strftime(wnvAgg$Date, "%U")), as.numeric(strftime(wnvAgg$Date, "%d")))
 
 ggplot(wnvAgg, aes(x=Date, y=NumMosquitos)) + geom_bar(aes(fill=WnvPresent), stat = "identity") + facet_wrap(~Year, scales = "free_x") 
 
@@ -56,15 +94,16 @@ ggplot(wnvAgg, aes(x=Date, y=NumMosquitos)) + geom_bar(aes(fill=WnvPresent), sta
 
 ```{r}
 spray$Date <- as.Date(spray$Date)
-spray[, c("Year", "Month", "Week", "Day")] <- cbind(strftime(spray$Date, "%Y"), strftime(spray$Date, "%m"), strftime(spray$Date, "%U"), strftime(spray$Date, "%d"))   
+spray[, c("Year", "Month", "Week", "Day")] <- cbind(as.numeric(strftime(spray$Date, "%Y")), as.numeric(strftime(spray$Date, "%m")), 
+                                                    as.numeric(strftime(spray$Date, "%U")), as.numeric(strftime(spray$Date, "%d")))   
 
-ggmap(mapdata) + 
-  geom_point(aes(x=Longitude, y=Latitude, color="traps"), data=wnvAgg, alpha=0.8) +
-  geom_point(aes(x=Longitude, y=Latitude, color="virus"), data=wnvAgg[wnvAgg$WnvPresent == 1 ,], alpha=0.5) +
-   geom_point(aes(x=Longitude, y=Latitude, color="spray"), data=spray, alpha=0.5) +
-    facet_wrap(~Year+Month) +
-  #geom_point(aes(x=Longitude, y=Latitude, color="virus"), data=wnv[wnv$WnvPresent == 1, ]) +
-  ggtitle("Mosquito Traps and Spray Locations")
+# ggmap(mapdata) + 
+#   geom_point(aes(x=Longitude, y=Latitude, color="traps"), data=wnvAgg, alpha=0.8) +
+#   geom_point(aes(x=Longitude, y=Latitude, color="virus"), data=wnvAgg[wnvAgg$WnvPresent == 1 ,], alpha=0.5) +
+#    geom_point(aes(x=Longitude, y=Latitude, color="spray"), data=spray, alpha=0.5) +
+#     facet_wrap(~Year+Month) +
+#   #geom_point(aes(x=Longitude, y=Latitude, color="virus"), data=wnv[wnv$WnvPresent == 1, ]) +
+#   ggtitle("Mosquito Traps and Spray Locations")
 
 
 ## TODO compute conditional on month and year and write time series
@@ -77,7 +116,6 @@ udateDf <- expand.grid(wnwDate = unique(wnvAgg$Date), sprayDate = unique(spray$D
 udateDf <- udateDf %>% mutate(delta=wnwDate - sprayDate) %>% filter(delta > 0 & delta < 8) %>% group_by(wnwDate) %>% 
   summarise(sprayDate=min(sprayDate), delta=min(delta))
 
-latlong <- c("Longitude", "Latitude")
 
 trsp <- wnvAgg %>% inner_join(udateDf, by = c("Date" = "wnwDate"))
   
@@ -132,7 +170,6 @@ uLocations$closestStation <- apply(weatherMatrixDistance, 1, function(x){
   which(x == m)})
 
 
-weather$Date <- as.Date(weather$Date, format="%Y-%m-%d")
 
 wnvAgg <- wnvAgg %>% left_join(uLocations)  %>% left_join(weather, by=c("closestStation" =  "Station", "Date" = "Date"))
 
@@ -141,12 +178,80 @@ wnvAgg <- wnvAgg %>% left_join(uLocations)  %>% left_join(weather, by=c("closest
 
 ```{r}
 
-library(rpart)
+speciesSummary <- wnvAgg %>%  group_by(Month, Year, Species, WnvPresent) %>% summarise(NumMosquitos=sum(NumMosquitos))
 
-singleTree <- rpart(WnvPresent~., data=wnvAgg, method = "class")
+ggplot(speciesSummary) + geom_bar(aes(x=Month, y=NumMosquitos, fill=WnvPresent), stat = "identity") + facet_wrap(~Species+Year)
 
-summary(singleTree)
+speciesSummary <- wnvAgg %>% group_by(Species, WnvPresent) %>% summarise(NumMosquitos=sum(NumMosquitos))
 
-prop.table(table(p=predict(singleTree, wnvAgg, type="class"), a=wnvAgg$WnvPresent))
+ggplot(speciesSummary) + geom_bar(aes(x=Species, y=NumMosquitos, fill=WnvPresent), stat = "identity")
+
+targetSpecies <- speciesSummary %>% filter(WnvPresent==1)
+
+species <- as.character(wnvAgg$Species)
+wnvAgg$Species <- factor(if_else(species %in% c("CULEX PIPIENS", "CULEX PIPIENS/RESTUANS", "CULEX RESTUANS"), species, "other"))
+
+
+```
+
+```{r}
+setdiff(test$Trap, wnv$Trap)
+
+wnvAgg$SatelliteTrap <- factor(if_else(nchar(substr(as.character(wnvAgg$Trap), 5,6)) > 0, 1, 0))
+
+satelliteTrapSummary <- wnvAgg %>%  group_by(Month, Year, SatelliteTrap, WnvPresent) %>% summarise(NumMosquitos=sum(NumMosquitos))
+
+ggplot(satelliteTrapSummary) + geom_bar(aes(x=Month, y=NumMosquitos, fill=WnvPresent), stat = "identity") + facet_wrap(~SatelliteTrap+Year)
+```
+
+```{r}
+augmentTestData <- function(df, weatherStation = matrix(c( -87.933 , 41.995, -87.752, 41.786), ncol = 2, byrow = TRUE)){
+  
+  latlong <- c("Longitude", "Latitude")
+ 
+  
+  df$SatelliteTrap <- factor(if_else(nchar(substr(as.character(df$Trap), 5,6)) > 0, 1, 0))
+ 
+  dfAgg <- df %>% select(Date, Species, SatelliteTrap, Block, Latitude, Longitude, AddressAccuracy,) %>%
+  group_by(Date, Species, SatelliteTrap, Block, Latitude, Longitude, AddressAccuracy)
+
+
+dfAgg$Date <- as.Date(dfAgg$Date)
+species <- as.character(dfAgg$Species)
+dfAgg$Species <- factor(if_else(species %in% c("CULEX PIPIENS", "CULEX PIPIENS/RESTUANS", "CULEX RESTUANS"), species, "other"))
+
+
+dfAgg[, c("Year", "Month", "Week", "Day")] <- cbind(as.numeric(strftime(dfAgg$Date, "%Y")), as.numeric(strftime(dfAgg$Date, "%m")), 
+                                                    as.numeric(strftime(dfAgg$Date, "%U")), as.numeric(strftime(dfAgg$Date, "%d")))   
+
+
+uLocations <- unique(dfAgg[, latlong])
+
+weatherMatrixDistance <- distm(uLocations,weatherStation )
+
+uLocations$closestStation <- apply(weatherMatrixDistance, 1, function(x){
+  m<-min(x)
+  which(x == m)})
+
+
+weather$Date <- as.Date(weather$Date, format="%Y-%m-%d")
+
+dfAgg <- dfAgg %>% left_join(uLocations)  %>% left_join(weather, by=c("closestStation" =  "Station", "Date" = "Date"))
+
+dfAgg
+}
+
+
+wnvAugmented <- augmentTestData(wnv)
+
+testAugmented <- augmentTestData(test)
+
+
+```
+
+```{r}
+saveRDS(wnvAgg , file = "wnvAgg.RDS")
+saveRDS(testAugmented , file = "testAugmented.RDS")
+
 
 ```
