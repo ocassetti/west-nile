@@ -1,0 +1,152 @@
+---
+title: "West Nile Virus Prediction EDA"
+author: "Oscar Cassetti"
+date: "November 26, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 
+
+```{r}
+library(ggmap) 
+library(dplyr)
+library(ggplot2)
+
+dataDir <- "../input"
+wnv <- read.csv(file.path(dataDir, "train.csv"))
+
+spray <- read.csv(file.path(dataDir, "spray.csv"))
+
+weather <- read.csv(file.path(dataDir, "weather.csv"))
+
+mapdata <- readRDS(file.path(dataDir, "mapdata_copyright_openstreetmap_contributors.rds"))
+
+
+```
+
+```{r}
+ggmap(mapdata) + 
+  geom_point(aes(x=Longitude, y=Latitude, color="spray"), data=spray) +
+  geom_point(aes(x=Longitude, y=Latitude, color="traps"), data=wnv) +
+  #geom_point(aes(x=Longitude, y=Latitude, color="virus"), data=wnv[wnv$WnvPresent == 1, ]) +
+  ggtitle("Mosquito Traps and Spray Locations")
+
+```
+```{r}
+
+wnvAgg <- wnv %>% select(Date, Address, Species, Block, Street, Trap, Latitude, Longitude, AddressAccuracy, NumMosquitos, WnvPresent) %>%
+  group_by(Date, Address, Species, Block, Street, Trap, Latitude, Longitude, AddressAccuracy) %>%
+  summarise(NumMosquitos=sum(NumMosquitos), WnvPresent=max(WnvPresent))
+
+
+wnvAgg$Date <- as.Date(wnvAgg$Date)
+wnvAgg$WnvPresent <- factor(wnvAgg$WnvPresent)
+
+
+wnvAgg[, c("Year", "Month", "Week", "Day")] <- cbind(strftime(wnvAgg$Date, "%Y"), strftime(wnvAgg$Date, "%m"), strftime(wnvAgg$Date, "%U"), strftime(wnvAgg$Date, "%d"))   
+
+ggplot(wnvAgg, aes(x=Date, y=NumMosquitos)) + geom_bar(aes(fill=WnvPresent), stat = "identity") + facet_wrap(~Year, scales = "free_x") 
+
+```
+
+
+```{r}
+spray$Date <- as.Date(spray$Date)
+spray[, c("Year", "Month", "Week", "Day")] <- cbind(strftime(spray$Date, "%Y"), strftime(spray$Date, "%m"), strftime(spray$Date, "%U"), strftime(spray$Date, "%d"))   
+
+ggmap(mapdata) + 
+  geom_point(aes(x=Longitude, y=Latitude, color="traps"), data=wnvAgg, alpha=0.8) +
+  geom_point(aes(x=Longitude, y=Latitude, color="virus"), data=wnvAgg[wnvAgg$WnvPresent == 1 ,], alpha=0.5) +
+   geom_point(aes(x=Longitude, y=Latitude, color="spray"), data=spray, alpha=0.5) +
+    facet_wrap(~Year+Month) +
+  #geom_point(aes(x=Longitude, y=Latitude, color="virus"), data=wnv[wnv$WnvPresent == 1, ]) +
+  ggtitle("Mosquito Traps and Spray Locations")
+
+
+## TODO compute conditional on month and year and write time series
+```
+```{r}
+library(geosphere)
+
+udateDf <- expand.grid(wnwDate = unique(wnvAgg$Date), sprayDate = unique(spray$Date))
+
+udateDf <- udateDf %>% mutate(delta=wnwDate - sprayDate) %>% filter(delta > 0 & delta < 8) %>% group_by(wnwDate) %>% 
+  summarise(sprayDate=min(sprayDate), delta=min(delta))
+
+latlong <- c("Longitude", "Latitude")
+
+trsp <- wnvAgg %>% inner_join(udateDf, by = c("Date" = "wnwDate"))
+  
+mtrsp <- as.matrix(trsp[, c("Longitude", "Latitude")], ncol=2)
+
+spr <- unique(spray[spray$Date %in% udateDf$sprayDate, latlong])
+
+mspr <- as.matrix(spr, ncol=2) 
+
+# distances in meter
+mdist <- distm(mtrsp, mspr)
+
+mdist <- unique(which(mdist < 1000, arr.ind=TRUE)[,1] )
+
+trsp <- trsp[mdist,]
+
+
+trsp2 <- wnvAgg %>% inner_join(unique(trsp[, c(latlong)]), by=c("Latitude", "Longitude")) %>% 
+  left_join(unique(trsp[, c(latlong, "Date", "sprayDate")]), by=c("Latitude" = "Latitude", "Longitude" = "Latitude", "Date" = "Date"))
+
+
+trsp2$Sprayed <-  factor(if_else(!is.na(trsp2$sprayDate), 1, 0))
+
+ggplot(trsp2[trsp2$Year %in% c(2011, 2013), ]) + geom_line(aes(x=Date, y=NumMosquitos)) +
+  geom_point(aes(x=Date, y=NumMosquitos, color="spray"), data=trsp2[trsp2$Sprayed ==1, ]) +
+  facet_wrap(~Year+Trap, scales = "free") 
+
+
+
+```
+```{r}
+
+chRateDf <- wnvAgg %>% group_by(Trap, Species, Date ) %>% arrange(Trap, Species, Date) %>% summarise(NumMosquitos=sum(NumMosquitos))  %>% mutate(chRate=
+                                             ( NumMosquitos - lag(NumMosquitos, default = NA)) /
+                                             as.double( Date - lag(Date, default = NA) )
+                                             ) %>% arrange(Trap, Species, Date)
+
+wnvAgg <- wnvAgg %>% left_join(chRateDf, by=c("Date", "Trap", "Species"), suffix=c("", "_Y")) %>% select(c(colnames(wnvAgg),"chRate")) 
+
+
+```
+
+```{r}
+weatherStation <- matrix(c( -87.933 , 41.995, -87.752, 41.786), ncol = 2, byrow = TRUE)
+
+uLocations <- unique(wnvAgg[, latlong])
+
+weatherMatrixDistance <- distm(uLocations,weatherStation )
+
+uLocations$closestStation <- apply(weatherMatrixDistance, 1, function(x){
+  m<-min(x)
+  which(x == m)})
+
+
+weather$Date <- as.Date(weather$Date, format="%Y-%m-%d")
+
+wnvAgg <- wnvAgg %>% left_join(uLocations)  %>% left_join(weather, by=c("closestStation" =  "Station", "Date" = "Date"))
+
+
+```
+
+```{r}
+
+library(rpart)
+
+singleTree <- rpart(WnvPresent~., data=wnvAgg, method = "class")
+
+summary(singleTree)
+
+prop.table(table(p=predict(singleTree, wnvAgg, type="class"), a=wnvAgg$WnvPresent))
+
+```
