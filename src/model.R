@@ -2,7 +2,17 @@
 wnvAgg <- readRDS("src/wnvAgg.RDS")
 testAugmented <- readRDS("src/testAugmented.RDS")
 
+
+wnvAgg$WnvPresent <- factor(sapply(wnvAgg$WnvPresent, function(x){
+  retVal <- 'N'
+  if(x == 1){
+  retVal <- 'Y'
+  }
+  
+  retVal
+})))
 intersect(colnames(wnvAgg), colnames(testAugmented) )
+setdiff(colnames(wnvAgg), colnames(testAugmented) )
 inputDataAgg <- wnvAgg[,c(colnames(testAugmented), "WnvPresent")]
 
 library(caret)
@@ -11,20 +21,18 @@ idxList <- createDataPartition(inputDataAgg$WnvPresent, p = .75, list = FALSE)
 modelTrainingDf <- inputDataAgg[ idxList,]
 modelTestingDf  <- inputDataAgg[-idxList,]
 
-gbmGrid <-  expand.grid(interaction.depth = c(1, 5, 9), 
-                        n.trees = (10:30)*50, 
-                        shrinkage = 0.1,
-                        n.minobsinnode = 20)
+gbmGrid <-  expand.grid(mtry=sqrt(ncol(inputDataAgg)))
 
 fitControl <- trainControl( method = "repeatedcv",
                             number = 10,
                             repeats = 5, 
+                            classProbs = TRUE,
                             selectionFunction = "oneSE")
 
-gbmFit1 <- train(WnvPresent ~ ., data = inputDataAgg, 
+gbmFit1 <- train(WnvPresent ~ ., data = modelTrainingDf, 
                  method = "rf", 
                  trControl = fitControl,
-                 metric="Kappa",
+                 metric="ROC",
                  nTrain = 0.5,
                  verbose = TRUE)
 

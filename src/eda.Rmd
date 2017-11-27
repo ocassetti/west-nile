@@ -35,7 +35,7 @@ hhMMToSeconds <- function(x){
   x <- as.numeric(x)/100
   floor(x) * 3600 + (x - floor(x) ) * 60
 }
-weather <- weather %>% mutate(Tavg=as.numeric(replace(as.character(weather$Tavg), Tavg == "M" , as.integer(Tmax) - as.integer(Tmin))))
+weather <- weather %>% mutate(Tavg=if_else(Tavg == "M" , as.character(Tmax - Tmin), as.character(Tavg)))
 
 weather <- weather %>% arrange(Date, Station) %>% mutate(Depart=as.numeric(if_else(Depart=="M", lag(Depart), Depart)))
 weather <- weather %>% arrange(Date, Station) %>% mutate(Sunrise=if_else(Sunrise=="-", as.character(lag(Sunrise)), as.character(Sunrise)))
@@ -68,6 +68,11 @@ filter(weather, Station==1) %>% arrange(Station, Date) %>% mutate(WetBulb1=lag(W
                                                                   WetBulb5=lag(WetBulb, n = 5, order_by=Date),
                                                                   WetBulb8=lag(WetBulb, n = 8, order_by=Date),
                                                                   WetBulb12=lag(WetBulb, n = 12, order_by=Date),
+                                                                  DewPoint1=lag(DewPoint, order_by=Date), 
+                                                                  DewPoint3=lag(DewPoint, n = 3, order_by=Date),
+                                                                  DewPoint5=lag(DewPoint, n = 5, order_by=Date),
+                                                                  DewPoint8=lag(DewPoint, n = 8, order_by=Date),
+                                                                  DewPoint12=lag(DewPoint, n = 12, order_by=Date),
                                                                   PrecipTotal1=lag(PrecipTotal, order_by=Date),
                                                                   PrecipTotal3=lag(PrecipTotal, n = 3, order_by=Date),
                                                                   PrecipTotal5=lag(PrecipTotal, n = 5, order_by=Date),
@@ -77,13 +82,28 @@ filter(weather, Station==1) %>% arrange(Station, Date) %>% mutate(WetBulb1=lag(W
                                                                   Tavg3=lag(Tavg, n = 3, order_by=Date),
                                                                   Tavg5=lag(Tavg, n = 5, order_by=Date),
                                                                   Tavg8=lag(Tavg, n = 8, order_by=Date),
-                                                                  Tavg12=lag(Tavg, n = 12, order_by=Date)
+                                                                  Tavg12=lag(Tavg, n = 12, order_by=Date),
+                                                                  Tmax1=lag(Tmax, order_by=Date),
+                                                                  Tmax3=lag(Tmax, n = 3, order_by=Date),
+                                                                  Tmax5=lag(Tmax, n = 5, order_by=Date),
+                                                                  Tmax8=lag(Tmax, n = 8, order_by=Date),
+                                                                  Tmax12=lag(Tmax, n = 12, order_by=Date),
+                                                                  Tmin1=lag(Tmin, order_by=Date),
+                                                                  Tmin3=lag(Tmin, n = 3, order_by=Date),
+                                                                  Tmin5=lag(Tmin, n = 5, order_by=Date),
+                                                                  Tmin8=lag(Tmin, n = 8, order_by=Date),
+                                                                  Tmin12=lag(Tmin, n = 12, order_by=Date)                                                 
                                                                   ) ,
 filter(weather, Station==2) %>% arrange(Station, Date) %>% mutate(WetBulb1=lag(WetBulb, order_by=Date), 
                                                                   WetBulb3=lag(WetBulb, n = 3, order_by=Date),
                                                                   WetBulb5=lag(WetBulb, n = 5, order_by=Date),
                                                                   WetBulb8=lag(WetBulb, n = 8, order_by=Date),
                                                                   WetBulb12=lag(WetBulb, n = 12, order_by=Date),
+                                                                  DewPoint1=lag(DewPoint, order_by=Date), 
+                                                                  DewPoint3=lag(DewPoint, n = 3, order_by=Date),
+                                                                  DewPoint5=lag(DewPoint, n = 5, order_by=Date),
+                                                                  DewPoint8=lag(DewPoint, n = 8, order_by=Date),
+                                                                  DewPoint12=lag(DewPoint, n = 12, order_by=Date),
                                                                   PrecipTotal1=lag(PrecipTotal, order_by=Date),
                                                                   PrecipTotal3=lag(PrecipTotal, n = 3, order_by=Date),
                                                                   PrecipTotal5=lag(PrecipTotal, n = 5, order_by=Date),
@@ -93,13 +113,25 @@ filter(weather, Station==2) %>% arrange(Station, Date) %>% mutate(WetBulb1=lag(W
                                                                   Tavg3=lag(Tavg, n = 3, order_by=Date),
                                                                   Tavg5=lag(Tavg, n = 5, order_by=Date),
                                                                   Tavg8=lag(Tavg, n = 8, order_by=Date),
-                                                                  Tavg12=lag(Tavg, n = 12, order_by=Date)
+                                                                  Tavg12=lag(Tavg, n = 12, order_by=Date),
+                                                                  Tmax1=lag(Tmax, order_by=Date),
+                                                                  Tmax3=lag(Tmax, n = 3, order_by=Date),
+                                                                  Tmax5=lag(Tmax, n = 5, order_by=Date),
+                                                                  Tmax8=lag(Tmax, n = 8, order_by=Date),
+                                                                  Tmax12=lag(Tmax, n = 12, order_by=Date),
+                                                                  Tmin1=lag(Tmin, order_by=Date),
+                                                                  Tmin3=lag(Tmin, n = 3, order_by=Date),
+                                                                  Tmin5=lag(Tmin, n = 5, order_by=Date),
+                                                                  Tmin8=lag(Tmin, n = 8, order_by=Date),
+                                                                  Tmin12=lag(Tmin, n = 12, order_by=Date)  
                                                                   )  
 ) %>% arrange(Date, Station)
 
-for( i in 20:34){
+startColIdx <- ncol(weather) + 1
+
+for( i in seq(startColIdx, ncol(weatherLagged))){
   xVal <- weatherLagged[,i]
-  weatherLagged[, i] <- if_else(is.na(xVal), mean(xVal, na.rm = TRUE), xVal)
+  weatherLagged[, i] <- if_else(is.na(xVal), mean(xVal, na.rm = TRUE), as.numeric(xVal))
 }
 
 weather <- weatherLagged 
@@ -218,22 +250,35 @@ wnvAgg <- wnvAgg %>% left_join(uLocations)  %>% left_join(weather, by=c("closest
 
 ```
 
+Hard to undestand if we can label all mosquitos in the trap as with the virus
 ```{r}
 
-speciesSummary <- wnvAgg %>%  group_by(Week, Year, Species, WnvPresent) %>% summarise(NumMosquitos=sum(NumMosquitos))
+speciesSummary <- wnvAgg %>%  group_by(Week, Year, Species, WnvPresent) %>% summarise(LogSumNumMosquitos=log(sum(NumMosquitos)))
+speciesSummary
+ggplot(speciesSummary) + geom_bar(aes(x=Week, y=LogSumNumMosquitos, fill=WnvPresent), stat = "identity") + facet_wrap(~Species+Year)
 
-ggplot(speciesSummary) + geom_bar(aes(x=Week, y=NumMosquitos, fill=WnvPresent), stat = "identity") + facet_wrap(~Species+Year)
+speciesSummary <- wnvAgg %>% group_by(Species, WnvPresent) %>% summarise(Count=length(NumMosquitos))
 
-speciesSummary <- wnvAgg %>% group_by(Species, WnvPresent) %>% summarise(NumMosquitos=sum(NumMosquitos))
-
-ggplot(speciesSummary) + geom_bar(aes(x=Species, y=NumMosquitos, fill=WnvPresent), stat = "identity")
+ggplot(speciesSummary) + geom_bar(aes(x=Species, y=Count, fill=WnvPresent), stat = "identity")
 
 targetSpecies <- speciesSummary %>% filter(WnvPresent==1)
 
 species <- as.character(wnvAgg$Species)
+table(species)
+
 wnvAgg$Species <- factor(if_else(species %in% c("CULEX PIPIENS", "CULEX PIPIENS/RESTUANS", "CULEX RESTUANS"), species, "other"))
 
+speciesSummary <- wnvAgg %>%  group_by(Week, Year, Species, WnvPresent) %>% summarise(LogSumNumMosquitos=log(sum(NumMosquitos)))
+speciesSummary
+ggplot(speciesSummary) + geom_bar(aes(x=Week, y=LogSumNumMosquitos, fill=WnvPresent), stat = "identity") + facet_wrap(~Species+Year)
 
+speciesSummary <- wnvAgg %>% group_by(Species, WnvPresent) %>% summarise(Count=length(NumMosquitos))
+
+ggplot(speciesSummary) + geom_bar(aes(x=Species, y=Count, fill=WnvPresent), stat = "identity")
+
+wnvbySpecies <- wnvAgg %>% group_by(Species, Week) %>% summarise(pSpecies=sum(if_else(WnvPresent==1, 1, 0)/length(WnvPresent)))
+
+wnvAgg<-wnvAgg %>% left_join(wnvbySpecies, by=c("Species", "Week"))
 ```
 
 ```{r}
@@ -245,6 +290,50 @@ satelliteTrapSummary <- wnvAgg %>%  group_by(Month, Year, SatelliteTrap, WnvPres
 
 ggplot(satelliteTrapSummary) + geom_bar(aes(x=Month, y=NumMosquitos, fill=WnvPresent), stat = "identity") + facet_wrap(~SatelliteTrap+Year)
 ```
+
+
+Hotspot distance rather than knn
+
+```{r}
+
+hotspotDf <- wnvAgg %>% group_by(Year, Latitude, Longitude) %>% summarise(p=sum(if_else(WnvPresent == 1, 1, 0))/length(WnvPresent))
+hotspotDf <- hotspotDf %>% left_join(hotspotDf %>% group_by(Year) %>% summarise(p90=quantile(p, 0.90)), by="Year")
+
+
+ ggmap(mapdata) + 
+   geom_point(aes(x=Longitude, y=Latitude, color="virus"), data=subset(hotspotDf, p>=p90), alpha=0.5) +
+#    geom_point(aes(x=Longitude, y=Latitude, color="spray"), data=spray, alpha=0.5) +
+     facet_grid(~Year) +
+#   #geom_point(aes(x=Longitude, y=Latitude, color="virus"), data=wnv[wnv$WnvPresent == 1, ]) +
+   ggtitle("Potential hotspots")
+
+
+hotspotDf <- subset(hotspotDf, p>=p90)
+
+
+hotspotDf
+
+
+distanceToHostpost <- as.data.frame(do.call(rbind,
+lapply(unique(wnvAgg$Year), function(year){
+
+hotSpotLocations <- as.matrix(hotspotDf[hotspotDf$Year == year, latlong], ncol=2)
+trapLocation <- as.matrix(unique(wnvAgg[wnvAgg$Year == year, latlong]), ncol=2) 
+
+trapToHostSpot <- distm(trapLocation, hotSpotLocations)
+
+minToHotSpot <- apply(trapToHostSpot, 1, min)
+maxToHotSpot <- apply(trapToHostSpot, 1, max)
+avgToHotSpot <- apply(trapToHostSpot, 1, mean)
+
+cbind(trapLocation, minToHotSpot, maxToHotSpot, avgToHotSpot, Year=rep(year, length(avgToHotSpot)))
+})
+))
+
+wnvAgg <- wnvAgg %>% left_join(distanceToHostpost,  by = c("Latitude", "Longitude", "Year"))
+```
+
+
 
 ```{r}
 augmentTestData <- function(df, weatherStation = matrix(c( -87.933 , 41.995, -87.752, 41.786), ncol = 2, byrow = TRUE)){
@@ -281,21 +370,43 @@ weather$Date <- as.Date(weather$Date, format="%Y-%m-%d")
 
 dfAgg <- dfAgg %>% left_join(uLocations)  %>% left_join(weather, by=c("closestStation" =  "Station", "Date" = "Date"))
 
+dfAgg <-  dfAgg %>% left_join(wnvbySpecies, by=c("Species", "Week"))
+
+distanceToHostpost <- as.data.frame(do.call(rbind,
+lapply(unique(dfAgg$Year), function(year){
+
+hotSpotLocations <- as.matrix(hotspotDf[hotspotDf$Year == (year-1), latlong], ncol=2)
+trapLocation <- as.matrix(unique(dfAgg[dfAgg$Year == year, latlong]), ncol=2) 
+
+trapToHostSpot <- distm(trapLocation, hotSpotLocations)
+
+minToHotSpot <- apply(trapToHostSpot, 1, min)
+maxToHotSpot <- apply(trapToHostSpot, 1, max)
+avgToHotSpot <- apply(trapToHostSpot, 1, mean)
+
+cbind(trapLocation, minToHotSpot, maxToHotSpot, avgToHotSpot, Year=rep(year, length(avgToHotSpot)))
+})
+))
+
+dfAgg <- dfAgg %>% left_join(distanceToHostpost,  by = c("Latitude", "Longitude", "Year"))
+
+
 dfAgg
 }
 
 
-wnvAugmented <- augmentTestData(wnv)
+#wnvAugmented <- augmentTestData(wnv)
 
 testAugmented <- augmentTestData(test)
 
-range(testAugmented$Tcount)
+table(is.na(testAugmented$pSpecies))
 
 ```
+Two transformation function because otherwise we can rescore them in Kaggle
 
 ```{r}
 saveRDS(wnvAgg , file = "wnvAgg.RDS")
 saveRDS(testAugmented , file = "testAugmented.RDS")
 
 
-S```
+```
