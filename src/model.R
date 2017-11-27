@@ -10,7 +10,7 @@ wnvAgg$WnvPresent <- factor(sapply(wnvAgg$WnvPresent, function(x){
   }
   
   retVal
-})))
+}))
 intersect(colnames(wnvAgg), colnames(testAugmented) )
 setdiff(colnames(wnvAgg), colnames(testAugmented) )
 inputDataAgg <- wnvAgg[,c(colnames(testAugmented), "WnvPresent")]
