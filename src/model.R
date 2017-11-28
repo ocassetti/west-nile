@@ -13,9 +13,11 @@ wnvAgg$WnvPresent <- factor(sapply(wnvAgg$WnvPresent, function(x){
   
   retVal
 }))
+
 intersect(colnames(wnvAgg), colnames(testAugmented) )
 setdiff(colnames(wnvAgg), colnames(testAugmented) )
-inputDataAgg <- wnvAgg[,c(colnames(testAugmented), "WnvPresent")]
+selectedVars <- setdiff(colnames(testAugmented), c("Date"))
+inputDataAgg <- wnvAgg[,c(selectedVars, "WnvPresent")]
 
 library(caret)
 
@@ -30,14 +32,23 @@ fitControl <- trainControl( method = "repeatedcv",
                             number = 10,
                             repeats = 5, 
                             classProbs = TRUE,
-                            selectionFunction = "oneSE")
+                            #selectionFunction = "oneSE"
+                            selectionFunction="tolerance",
+                            verboseIter = TRUE,
+                            summaryFunction = twoClassSummary
+                            )
+# nodesize
+# importance
 
 gbmFit1 <- train(WnvPresent ~ ., data = inputDataAgg, 
                  method = "rf", 
                  trControl = fitControl,
-                 metric="Kappa",
-                 nTrain = 0.5,
-                 ntree = 3000,
+                 metric="ROC",
+                 #nTrain = 0.5,
+                 nodesize=2,
+                 #importance=TRUE,
+                 ntree = 500,
+                 do.trace=TRUE,
                  verbose = TRUE)
 
 
@@ -60,13 +71,55 @@ saveRDS(modelYear, "modelYear.RDS")
 
 table(predict(gbmFit1, modelTestingDf), modelTestingDf$WnvPresent)
 
-saveRDS(gbmFit1, "rf.RDS")
+saveRDS(gbmFit1, "rf-1.RDS")
 
-
-table(predict(gbmFit1, modelTestingDf) , modelTestingDf$WnvPresent)
+#gbmFit1 <- readRDS("rf.RDS")
+table(predict(gbmFit1, inputDataAgg) , inputDataAgg$WnvPresent)
 
 predicted <- predict(gbmFit1, testAugmented)
 
 predicted <- as.numeric(predicted) - 1
 
 write.csv(data.frame(Id=as.character(seq(1, length(predicted))), WnvPresent=as.character(predicted)), "result.csv", row.names = FALSE)
+
+varImpPlot(gbmFit1$finalModel)
+
+
+library(randomForest)
+library(rpart)
+nomosquitoModel <- rpart(NumMosquitos~., wnvAgg[, c(selectedVars, 'NumMosquitos')], method="anova", control = rpart.control(minsplit = 10))
+
+
+testAugmented$NumMosquitos <- predict(nomosquitoModel, testAugmented)
+
+fitControl <- trainControl( method = "repeatedcv",
+                            number = 10,
+                            repeats = 5, 
+                            classProbs = TRUE,
+                            #selectionFunction = "oneSE"
+                            selectionFunction="tolerance",
+                            verboseIter = TRUE,
+                            summaryFunction = twoClassSummary
+)
+
+rfFitMosquitos <- train(WnvPresent ~ ., data = wnvAgg[, c(selectedVars, 'NumMosquitos', "WnvPresent")], 
+                 method = "rf", 
+                 trControl = fitControl,
+                 metric="ROC",
+                 #nTrain = 0.5,
+                 nodesize=2,
+                 #importance=TRUE,
+                 ntree = 500,
+                 do.trace=TRUE,
+                 verbose = TRUE)
+
+
+predicted <- predict(rfFitMosquitos, testAugmented)
+
+predicted <- as.numeric(predicted) - 1
+
+write.csv(data.frame(Id=as.character(seq(1, length(predicted))), WnvPresent=as.character(predicted)), "result-model-count.csv", row.names = FALSE)
+
+saveRDS(rfFitMosquitos, "rfFitMosquitos.RDS")
+
+varImpPlot(rfFitMosquitos$finalModel)

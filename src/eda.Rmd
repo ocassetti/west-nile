@@ -27,6 +27,9 @@ mapdata <- readRDS(file.path(dataDir, "mapdata_copyright_openstreetmap_contribut
 
 latlong <- c("Longitude", "Latitude")
 
+#weatherStation <- matrix(c( -87.933 , 41.995, -87.752, 41.786), ncol = 2, byrow = TRUE)
+weatherStation <- matrix(c( -87.933 , 41.995), ncol = 2, byrow = TRUE)
+
 ```
 
 ```{r}
@@ -35,6 +38,9 @@ hhMMToSeconds <- function(x){
   x <- as.numeric(x)/100
   floor(x) * 3600 + (x - floor(x) ) * 60
 }
+
+weather <- weather %>% filter(Station==1) %>% arrange(Date) 
+
 weather <- weather %>% mutate(Tavg=if_else(Tavg == "M" , as.character(Tmax - Tmin), as.character(Tavg)))
 
 weather <- weather %>% arrange(Date, Station) %>% mutate(Depart=as.numeric(if_else(Depart=="M", lag(Depart), Depart)))
@@ -42,8 +48,8 @@ weather <- weather %>% arrange(Date, Station) %>% mutate(Sunrise=if_else(Sunrise
 weather <- weather %>% arrange(Date, Station) %>% mutate(Sunset=if_else(Sunset=="-", as.character(lag(Sunset)), as.character(Sunset)))
 
 
-weather <- weather %>% mutate(Sunrise=hhMMToSeconds(Sunrise), Sunset=hhMMToSeconds(Sunset)) %>% mutate(DayLenght=(Sunset-Sunrise)) %>%
-mutate(DayLenght=(DayLenght - min(DayLenght))/(max(DayLenght) - min(DayLenght)))
+weather <- weather %>% mutate(Sunrise=hhMMToSeconds(Sunrise), Sunset=hhMMToSeconds(Sunset)) %>% mutate(DayLenght=(Sunset-Sunrise)) #%>%
+#mutate(DayLenght=(DayLenght - min(DayLenght))/(max(DayLenght) - min(DayLenght)))
 
 weather <- weather[, -which(colnames(weather) %in% c("Depth", "Water1", "SnowFall", "CodeSum"))]
 weather$Date <- as.Date(weather$Date, format="%Y-%m-%d")
@@ -133,6 +139,15 @@ for( i in seq(startColIdx, ncol(weatherLagged))){
   xVal <- weatherLagged[,i]
   weatherLagged[, i] <- if_else(is.na(xVal), mean(xVal, na.rm = TRUE), as.numeric(xVal))
 }
+
+library(zoo)
+
+for (colName in colnames(weatherLagged)[3:18]){
+    movingAvgName <- sprintf("%sMA",colName)
+    weatherLagged[, movingAvgName] <- rollmean(weatherLagged[, colName], 10, align = "right", fill = mean(weatherLagged[1:10, colName]))
+ }
+
+weatherLagged
 
 weather <- weatherLagged 
 
@@ -233,20 +248,20 @@ wnvAgg <- wnvAgg %>% left_join(chRateDf, by=c("Date", "Trap", "Species"), suffix
 ```
 
 ```{r}
-weatherStation <- matrix(c( -87.933 , 41.995, -87.752, 41.786), ncol = 2, byrow = TRUE)
-
 uLocations <- unique(wnvAgg[, latlong])
 
 weatherMatrixDistance <- distm(uLocations,weatherStation )
 
 uLocations$closestStation <- apply(weatherMatrixDistance, 1, function(x){
-  m<-min(x)
-  which(x == m)})
+  minDist<-min(x)
+  #which(x == m)
+  # return distance 
+  minDist})
 
 
 
-wnvAgg <- wnvAgg %>% left_join(uLocations)  %>% left_join(weather, by=c("closestStation" =  "Station", "Date" = "Date"))
-
+#wnvAgg <- wnvAgg %>% left_join(uLocations)  %>% left_join(weather, by=c("closestStation" =  "Station", "Date" = "Date"))
+wnvAgg <- wnvAgg %>% left_join(uLocations, by=c("Latitude", "Longitude"))  %>% left_join(weather, by=c("Date" = "Date"))
 
 ```
 
@@ -280,6 +295,7 @@ wnvbySpecies <- wnvAgg %>% group_by(Species, Week) %>% summarise(pSpecies=sum(if
 
 wnvAgg<-wnvAgg %>% left_join(wnvbySpecies, by=c("Species", "Week"))
 ```
+Virus does not occur in other species but needs checking
 
 ```{r}
 setdiff(test$Trap, wnv$Trap)
@@ -290,6 +306,7 @@ satelliteTrapSummary <- wnvAgg %>%  group_by(Month, Year, SatelliteTrap, WnvPres
 
 ggplot(satelliteTrapSummary) + geom_bar(aes(x=Month, y=NumMosquitos, fill=WnvPresent), stat = "identity") + facet_wrap(~SatelliteTrap+Year)
 ```
+Not clear the use of satellite traps
 
 
 Hotspot distance rather than knn
@@ -361,14 +378,20 @@ uLocations <- unique(dfAgg[, latlong])
 
 weatherMatrixDistance <- distm(uLocations,weatherStation )
 
+# uLocations$closestStation <- apply(weatherMatrixDistance, 1, function(x){
+#   m<-min(x)
+#   which(x == m)})
 uLocations$closestStation <- apply(weatherMatrixDistance, 1, function(x){
-  m<-min(x)
-  which(x == m)})
+  minDist<-min(x)
+  minDist})
+
+
 
 
 weather$Date <- as.Date(weather$Date, format="%Y-%m-%d")
 
-dfAgg <- dfAgg %>% left_join(uLocations)  %>% left_join(weather, by=c("closestStation" =  "Station", "Date" = "Date"))
+#dfAgg <- dfAgg %>% left_join(uLocations)  %>% left_join(weather, by=c("closestStation" =  "Station", "Date" = "Date"))
+dfAgg <- dfAgg %>% left_join(uLocations, by=c("Latitude", "Longitude"))  %>% left_join(weather, by=c("Date" = "Date"))
 
 dfAgg <-  dfAgg %>% left_join(wnvbySpecies, by=c("Species", "Week"))
 
