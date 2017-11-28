@@ -125,3 +125,38 @@ write.csv(data.frame(Id=as.character(seq(1, length(predicted))), WnvPresent=as.c
 saveRDS(rfFitMosquitos, "rfFitMosquitos.RDS")
 
 varImpPlot(rfFitMosquitos$finalModel)
+
+
+fitControl <- trainControl( method = "repeatedcv",
+                            number = 10,
+                            repeats = 5, 
+                            classProbs = TRUE,
+                            #selectionFunction = "oneSE"
+                            selectionFunction="tolerance",
+                            verboseIter = TRUE,
+                            summaryFunction = twoClassSummary
+)
+# nodesize
+# importance
+
+inputDataAggGBM <- inputDataAgg
+
+inputDataAggGBM$WnvPresent <- as.numeric(inputDataAggGBM$WnvPresent) - 1
+
+gbmGrid <-  expand.grid(interaction.depth = c(1, 5, 9), 
+                        n.trees = seq(10, 50, by=5), 
+                        shrinkage = 0.1,
+                        n.minobsinnode = 10)
+
+
+gbmFit2 <- train(WnvPresent ~ ., data = inputDataAgg, 
+                 method = "xgbTree", 
+                 trControl = fitControl,
+                 metric="ROC",
+                 nTrain = 0.5,
+                 verbose = TRUE)
+                 #tuneGrid = gbmGrid)
+
+table(predict(gbmFit2,  inputDataAgg) , inputDataAgg$WnvPresent)
+
+saveRDS(gbmFit2, "xgboost-tree.RDS")
