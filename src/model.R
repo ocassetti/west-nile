@@ -114,6 +114,8 @@ rfFitMosquitos <- train(WnvPresent ~ ., data = wnvAgg[, c(selectedVars, 'NumMosq
                  verbose = TRUE)
 
 
+table(predict(rfFitMosquitos, wnvAgg[, c(selectedVars, 'NumMosquitos', "WnvPresent")]) , inputDataAgg$WnvPresent)
+
 predicted <- predict(rfFitMosquitos, testAugmented)
 
 predicted <- as.numeric(predicted) - 1
