@@ -73,14 +73,15 @@ table(predict(gbmFit1, modelTestingDf), modelTestingDf$WnvPresent)
 
 saveRDS(gbmFit1, "rf-1.RDS")
 
-#gbmFit1 <- readRDS("rf.RDS")
+gbmFit1 <- readRDS("rf-1.RDS")
+gbmFit1 <- readRDS("rf.RDS")
 table(predict(gbmFit1, inputDataAgg) , inputDataAgg$WnvPresent)
 
-predicted <- predict(gbmFit1, testAugmented)
+predicted <- predict(gbmFit1, testAugmented, type = "prob")
 
-predicted <- as.numeric(predicted) - 1
 
-write.csv(data.frame(Id=as.character(seq(1, length(predicted))), WnvPresent=as.character(predicted)), "result.csv", row.names = FALSE)
+
+write.csv(data.frame(Id=as.character(seq(1, nrow(predicted))), WnvPresent=as.character(predicted[,2])), "result-rf-1.csv", row.names = FALSE)
 
 varImpPlot(gbmFit1$finalModel)
 
@@ -116,11 +117,14 @@ rfFitMosquitos <- train(WnvPresent ~ ., data = wnvAgg[, c(selectedVars, 'NumMosq
 
 table(predict(rfFitMosquitos, wnvAgg[, c(selectedVars, 'NumMosquitos', "WnvPresent")]) , inputDataAgg$WnvPresent)
 
-predicted <- predict(rfFitMosquitos, testAugmented)
+rfFitMosquitos <- readRDS("rfFitMosquitos.RDS")
+
+predicted <- predict(rfFitMosquitos, testAugmented, type="prob")
 
 predicted <- as.numeric(predicted) - 1
 
-write.csv(data.frame(Id=as.character(seq(1, length(predicted))), WnvPresent=as.character(predicted)), "result-model-count.csv", row.names = FALSE)
+write.csv(data.frame(Id=as.character(seq(1, nrow(predicted))), WnvPresent=as.character(predicted[,2])), "result-model-count.csv", row.names = FALSE)
+
 
 saveRDS(rfFitMosquitos, "rfFitMosquitos.RDS")
 
@@ -163,11 +167,10 @@ table(predict(gbmFit2,  inputDataAgg) , inputDataAgg$WnvPresent)
 
 saveRDS(gbmFit2, "xgboost-tree.RDS")
 
-predicted <- predict(gbmFit2, testAugmented)
-
-predicted <- as.numeric(predicted) - 1
+predicted <- predict(gbmFit2, testAugmented, type="prob")
 
 
 
-write.csv(data.frame(Id=as.character(seq(1, length(predicted))), WnvPresent=as.character(predicted)), "result-model-gbm.csv", row.names = FALSE)
+
+write.csv(data.frame(Id=as.character(seq(1, nrow(predicted))), WnvPresent=as.character(predicted[,2])), "result-model-gbm.csv", row.names = FALSE)
 

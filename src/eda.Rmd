@@ -7,9 +7,10 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.height=9, fig.width=12)
 ```
 
-# 
+# Maps
 
 ```{r}
 library(ggmap) 
@@ -182,17 +183,18 @@ ggplot(wnvAgg, aes(x=Week, y=NumMosquitos)) + geom_bar(aes(fill=WnvPresent), sta
 
 
 ```{r}
+
 spray$Date <- as.Date(spray$Date)
 spray[, c("Year", "Month", "Week", "Day")] <- cbind(as.numeric(strftime(spray$Date, "%Y")), as.numeric(strftime(spray$Date, "%m")), 
                                                     as.numeric(strftime(spray$Date, "%U")), as.numeric(strftime(spray$Date, "%d")))   
 
-# ggmap(mapdata) + 
-#   geom_point(aes(x=Longitude, y=Latitude, color="traps"), data=wnvAgg, alpha=0.8) +
-#   geom_point(aes(x=Longitude, y=Latitude, color="virus"), data=wnvAgg[wnvAgg$WnvPresent == 1 ,], alpha=0.5) +
-#    geom_point(aes(x=Longitude, y=Latitude, color="spray"), data=spray, alpha=0.5) +
-#     facet_wrap(~Year+Month) +
-#   #geom_point(aes(x=Longitude, y=Latitude, color="virus"), data=wnv[wnv$WnvPresent == 1, ]) +
-#   ggtitle("Mosquito Traps and Spray Locations")
+ggmap(mapdata) +
+  geom_point(aes(x=Longitude, y=Latitude, color="traps"), data=wnvAgg, alpha=0.8) +
+  geom_point(aes(x=Longitude, y=Latitude, color="virus"), data=wnvAgg[wnvAgg$WnvPresent == 1 ,], alpha=0.5) +
+   geom_point(aes(x=Longitude, y=Latitude, color="spray"), data=spray, alpha=0.5) +
+    facet_wrap(~Year+Month) +
+  #geom_point(aes(x=Longitude, y=Latitude, color="virus"), data=wnv[wnv$WnvPresent == 1, ]) +
+  ggtitle("Mosquito Traps and Spray Locations")
 
 
 ## TODO compute conditional on month and year and write time series
@@ -304,7 +306,7 @@ wnvAgg$SatelliteTrap <- factor(if_else(nchar(substr(as.character(wnvAgg$Trap), 5
 
 satelliteTrapSummary <- wnvAgg %>%  group_by(Month, Year, SatelliteTrap, WnvPresent) %>% summarise(NumMosquitos=sum(NumMosquitos))
 
-ggplot(satelliteTrapSummary) + geom_bar(aes(x=Month, y=NumMosquitos, fill=WnvPresent), stat = "identity") + facet_wrap(~SatelliteTrap+Year)
+ggplot(satelliteTrapSummary) + geom_bar(aes(x=Month, y=log(NumMosquitos), fill=WnvPresent), stat = "identity") + facet_wrap(~SatelliteTrap+Year)
 ```
 Not clear the use of satellite traps
 
@@ -318,7 +320,7 @@ hotspotDf <- hotspotDf %>% left_join(hotspotDf %>% group_by(Year) %>% summarise(
 
 
  ggmap(mapdata) + 
-   geom_point(aes(x=Longitude, y=Latitude, color="virus"), data=subset(hotspotDf, p>=p90), alpha=0.5) +
+   geom_point(aes(x=Longitude, y=Latitude, color="virus"), data=subset(hotspotDf, p>=p90), alpha=0.9) +
 #    geom_point(aes(x=Longitude, y=Latitude, color="spray"), data=spray, alpha=0.5) +
      facet_grid(~Year) +
 #   #geom_point(aes(x=Longitude, y=Latitude, color="virus"), data=wnv[wnv$WnvPresent == 1, ]) +
