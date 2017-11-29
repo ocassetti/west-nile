@@ -157,6 +157,17 @@ gbmFit2 <- train(WnvPresent ~ ., data = inputDataAgg,
                  verbose = TRUE)
                  #tuneGrid = gbmGrid)
 
+#gbmFit2 <- readRDS("xgboost-tree.RDS")
+
 table(predict(gbmFit2,  inputDataAgg) , inputDataAgg$WnvPresent)
 
 saveRDS(gbmFit2, "xgboost-tree.RDS")
+
+predicted <- predict(gbmFit2, testAugmented)
+
+predicted <- as.numeric(predicted) - 1
+
+
+
+write.csv(data.frame(Id=as.character(seq(1, length(predicted))), WnvPresent=as.character(predicted)), "result-model-gbm.csv", row.names = FALSE)
+
